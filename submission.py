@@ -177,7 +177,6 @@ def run_nnUNet_ensemble(output_folder_2d, output_folder_3d, results_folder):
     result = subprocess.run(command, check=True, text=True, capture_output=True)
 
 def presegmentation(total_segmentator_output_folder, charite_results_folder, final_channel_folder, imagesTs_path):
-    # TODO: load and initialize your model here
     predictor_2d = nnUNetPredictor(
         tile_step_size=0.5,
         use_gaussian=True,
