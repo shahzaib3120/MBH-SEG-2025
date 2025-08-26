@@ -22,181 +22,197 @@ import nibabel
 
 
 class NibabelIO(BaseReaderWriter):
-    """
-    Nibabel loads the images in a different order than sitk. We convert the axes to the sitk order to be
-    consistent. This is of course considered properly in segmentation export as well.
+	"""
+	Nibabel loads the images in a different order than sitk. We convert the axes to the sitk order to be
+	consistent. This is of course considered properly in segmentation export as well.
 
-    IMPORTANT: Run nnUNetv2_plot_overlay_pngs to verify that this did not destroy the alignment of data and seg!
-    """
-    supported_file_endings = [
-        '.nii',
-        '.nii.gz',
-    ]
+	IMPORTANT: Run nnUNetv2_plot_overlay_pngs to verify that this did not destroy the alignment of data and seg!
+	"""
 
-    def read_images(self, image_fnames: Union[List[str], Tuple[str, ...]]) -> Tuple[np.ndarray, dict]:
-        images = []
-        original_affines = []
+	supported_file_endings = [
+		'.nii',
+		'.nii.gz',
+	]
 
-        spacings_for_nnunet = []
-        for f in image_fnames:
-            nib_image = nibabel.load(f)
-            assert nib_image.ndim == 3, 'only 3d images are supported by NibabelIO'
-            original_affine = nib_image.affine
+	def read_images(
+		self, image_fnames: Union[List[str], Tuple[str, ...]]
+	) -> Tuple[np.ndarray, dict]:
+		images = []
+		original_affines = []
 
-            original_affines.append(original_affine)
+		spacings_for_nnunet = []
+		for f in image_fnames:
+			nib_image = nibabel.load(f)
+			assert nib_image.ndim == 3, 'only 3d images are supported by NibabelIO'
+			original_affine = nib_image.affine
 
-            # spacing is taken in reverse order to be consistent with SimpleITK axis ordering (confusing, I know...)
-            spacings_for_nnunet.append(
-                    [float(i) for i in nib_image.header.get_zooms()[::-1]]
-            )
+			original_affines.append(original_affine)
 
-            # transpose image to be consistent with the way SimpleITk reads images. Yeah. Annoying.
-            images.append(nib_image.get_fdata().transpose((2, 1, 0))[None])
+			# spacing is taken in reverse order to be consistent with SimpleITK axis ordering (confusing, I know...)
+			spacings_for_nnunet.append([float(i) for i in nib_image.header.get_zooms()[::-1]])
 
-        if not self._check_all_same([i.shape for i in images]):
-            print('ERROR! Not all input images have the same shape!')
-            print('Shapes:')
-            print([i.shape for i in images])
-            print('Image files:')
-            print(image_fnames)
-            raise RuntimeError()
-        if not self._check_all_same_array(original_affines):
-            print('WARNING! Not all input images have the same original_affines!')
-            print('Affines:')
-            print(original_affines)
-            print('Image files:')
-            print(image_fnames)
-            print('It is up to you to decide whether that\'s a problem. You should run nnUNetv2_plot_overlay_pngs to verify '
-                  'that segmentations and data overlap.')
-        if not self._check_all_same(spacings_for_nnunet):
-            print('ERROR! Not all input images have the same spacing_for_nnunet! This might be caused by them not '
-                  'having the same affine')
-            print('spacings_for_nnunet:')
-            print(spacings_for_nnunet)
-            print('Image files:')
-            print(image_fnames)
-            raise RuntimeError()
+			# transpose image to be consistent with the way SimpleITk reads images. Yeah. Annoying.
+			images.append(nib_image.get_fdata().transpose((2, 1, 0))[None])
 
-        dict = {
-            'nibabel_stuff': {
-                'original_affine': original_affines[0],
-            },
-            'spacing': spacings_for_nnunet[0]
-        }
-        return np.vstack(images, dtype=np.float32, casting='unsafe'), dict
+		if not self._check_all_same([i.shape for i in images]):
+			print('ERROR! Not all input images have the same shape!')
+			print('Shapes:')
+			print([i.shape for i in images])
+			print('Image files:')
+			print(image_fnames)
+			raise RuntimeError()
+		if not self._check_all_same_array(original_affines):
+			print('WARNING! Not all input images have the same original_affines!')
+			print('Affines:')
+			print(original_affines)
+			print('Image files:')
+			print(image_fnames)
+			print(
+				"It is up to you to decide whether that's a problem. You should run nnUNetv2_plot_overlay_pngs to verify "
+				'that segmentations and data overlap.'
+			)
+		if not self._check_all_same(spacings_for_nnunet):
+			print(
+				'ERROR! Not all input images have the same spacing_for_nnunet! This might be caused by them not '
+				'having the same affine'
+			)
+			print('spacings_for_nnunet:')
+			print(spacings_for_nnunet)
+			print('Image files:')
+			print(image_fnames)
+			raise RuntimeError()
 
-    def read_seg(self, seg_fname: str) -> Tuple[np.ndarray, dict]:
-        return self.read_images((seg_fname, ))
+		dict = {
+			'nibabel_stuff': {
+				'original_affine': original_affines[0],
+			},
+			'spacing': spacings_for_nnunet[0],
+		}
+		return np.vstack(images, dtype=np.float32, casting='unsafe'), dict
 
-    def write_seg(self, seg: np.ndarray, output_fname: str, properties: dict) -> None:
-        # revert transpose
-        seg = seg.transpose((2, 1, 0)).astype(np.uint8)
-        seg_nib = nibabel.Nifti1Image(seg, affine=properties['nibabel_stuff']['original_affine'])
-        nibabel.save(seg_nib, output_fname)
+	def read_seg(self, seg_fname: str) -> Tuple[np.ndarray, dict]:
+		return self.read_images((seg_fname,))
+
+	def write_seg(self, seg: np.ndarray, output_fname: str, properties: dict) -> None:
+		# revert transpose
+		seg = seg.transpose((2, 1, 0)).astype(np.uint8)
+		seg_nib = nibabel.Nifti1Image(seg, affine=properties['nibabel_stuff']['original_affine'])
+		nibabel.save(seg_nib, output_fname)
 
 
 class NibabelIOWithReorient(BaseReaderWriter):
-    """
-    Reorients images to RAS
+	"""
+	Reorients images to RAS
 
-    Nibabel loads the images in a different order than sitk. We convert the axes to the sitk order to be
-    consistent. This is of course considered properly in segmentation export as well.
+	Nibabel loads the images in a different order than sitk. We convert the axes to the sitk order to be
+	consistent. This is of course considered properly in segmentation export as well.
 
-    IMPORTANT: Run nnUNetv2_plot_overlay_pngs to verify that this did not destroy the alignment of data and seg!
-    """
-    supported_file_endings = [
-        '.nii',
-        '.nii.gz',
-    ]
+	IMPORTANT: Run nnUNetv2_plot_overlay_pngs to verify that this did not destroy the alignment of data and seg!
+	"""
 
-    def read_images(self, image_fnames: Union[List[str], Tuple[str, ...]]) -> Tuple[np.ndarray, dict]:
-        images = []
-        original_affines = []
-        reoriented_affines = []
+	supported_file_endings = [
+		'.nii',
+		'.nii.gz',
+	]
 
-        spacings_for_nnunet = []
-        for f in image_fnames:
-            nib_image = nibabel.load(f)
-            assert nib_image.ndim == 3, 'only 3d images are supported by NibabelIO'
-            original_affine = nib_image.affine
-            reoriented_image = nib_image.as_reoriented(io_orientation(original_affine))
-            reoriented_affine = reoriented_image.affine
+	def read_images(
+		self, image_fnames: Union[List[str], Tuple[str, ...]]
+	) -> Tuple[np.ndarray, dict]:
+		images = []
+		original_affines = []
+		reoriented_affines = []
 
-            original_affines.append(original_affine)
-            reoriented_affines.append(reoriented_affine)
+		spacings_for_nnunet = []
+		for f in image_fnames:
+			nib_image = nibabel.load(f)
+			assert nib_image.ndim == 3, 'only 3d images are supported by NibabelIO'
+			original_affine = nib_image.affine
+			reoriented_image = nib_image.as_reoriented(io_orientation(original_affine))
+			reoriented_affine = reoriented_image.affine
 
-            # spacing is taken in reverse order to be consistent with SimpleITK axis ordering (confusing, I know...)
-            spacings_for_nnunet.append(
-                    [float(i) for i in reoriented_image.header.get_zooms()[::-1]]
-            )
+			original_affines.append(original_affine)
+			reoriented_affines.append(reoriented_affine)
 
-            # transpose image to be consistent with the way SimpleITk reads images. Yeah. Annoying.
-            images.append(reoriented_image.get_fdata().transpose((2, 1, 0))[None])
+			# spacing is taken in reverse order to be consistent with SimpleITK axis ordering (confusing, I know...)
+			spacings_for_nnunet.append(
+				[float(i) for i in reoriented_image.header.get_zooms()[::-1]]
+			)
 
-        if not self._check_all_same([i.shape for i in images]):
-            print('ERROR! Not all input images have the same shape!')
-            print('Shapes:')
-            print([i.shape for i in images])
-            print('Image files:')
-            print(image_fnames)
-            raise RuntimeError()
-        if not self._check_all_same_array(reoriented_affines):
-            print('WARNING! Not all input images have the same reoriented_affines!')
-            print('Affines:')
-            print(reoriented_affines)
-            print('Image files:')
-            print(image_fnames)
-            print('It is up to you to decide whether that\'s a problem. You should run nnUNetv2_plot_overlay_pngs to verify '
-                  'that segmentations and data overlap.')
-        if not self._check_all_same(spacings_for_nnunet):
-            print('ERROR! Not all input images have the same spacing_for_nnunet! This might be caused by them not '
-                  'having the same affine')
-            print('spacings_for_nnunet:')
-            print(spacings_for_nnunet)
-            print('Image files:')
-            print(image_fnames)
-            raise RuntimeError()
+			# transpose image to be consistent with the way SimpleITk reads images. Yeah. Annoying.
+			images.append(reoriented_image.get_fdata().transpose((2, 1, 0))[None])
 
-        dict = {
-            'nibabel_stuff': {
-                'original_affine': original_affines[0],
-                'reoriented_affine': reoriented_affines[0],
-            },
-            'spacing': spacings_for_nnunet[0]
-        }
-        return np.vstack(images, dtype=np.float32, casting='unsafe'), dict
+		if not self._check_all_same([i.shape for i in images]):
+			print('ERROR! Not all input images have the same shape!')
+			print('Shapes:')
+			print([i.shape for i in images])
+			print('Image files:')
+			print(image_fnames)
+			raise RuntimeError()
+		if not self._check_all_same_array(reoriented_affines):
+			print('WARNING! Not all input images have the same reoriented_affines!')
+			print('Affines:')
+			print(reoriented_affines)
+			print('Image files:')
+			print(image_fnames)
+			print(
+				"It is up to you to decide whether that's a problem. You should run nnUNetv2_plot_overlay_pngs to verify "
+				'that segmentations and data overlap.'
+			)
+		if not self._check_all_same(spacings_for_nnunet):
+			print(
+				'ERROR! Not all input images have the same spacing_for_nnunet! This might be caused by them not '
+				'having the same affine'
+			)
+			print('spacings_for_nnunet:')
+			print(spacings_for_nnunet)
+			print('Image files:')
+			print(image_fnames)
+			raise RuntimeError()
 
-    def read_seg(self, seg_fname: str) -> Tuple[np.ndarray, dict]:
-        return self.read_images((seg_fname, ))
+		dict = {
+			'nibabel_stuff': {
+				'original_affine': original_affines[0],
+				'reoriented_affine': reoriented_affines[0],
+			},
+			'spacing': spacings_for_nnunet[0],
+		}
+		return np.vstack(images, dtype=np.float32, casting='unsafe'), dict
 
-    def write_seg(self, seg: np.ndarray, output_fname: str, properties: dict) -> None:
-        # revert transpose
-        seg = seg.transpose((2, 1, 0)).astype(np.uint8, copy=False)
+	def read_seg(self, seg_fname: str) -> Tuple[np.ndarray, dict]:
+		return self.read_images((seg_fname,))
 
-        seg_nib = nibabel.Nifti1Image(seg, affine=properties['nibabel_stuff']['reoriented_affine'])
-        seg_nib_reoriented = seg_nib.as_reoriented(io_orientation(properties['nibabel_stuff']['original_affine']))
-        if not np.allclose(properties['nibabel_stuff']['original_affine'], seg_nib_reoriented.affine):
-            print(f'WARNING: Restored affine does not match original affine. File: {output_fname}')
-            print(f'Original affine\n', properties['nibabel_stuff']['original_affine'])
-            print(f'Restored affine\n', seg_nib_reoriented.affine)
-        nibabel.save(seg_nib_reoriented, output_fname)
+	def write_seg(self, seg: np.ndarray, output_fname: str, properties: dict) -> None:
+		# revert transpose
+		seg = seg.transpose((2, 1, 0)).astype(np.uint8, copy=False)
+
+		seg_nib = nibabel.Nifti1Image(seg, affine=properties['nibabel_stuff']['reoriented_affine'])
+		seg_nib_reoriented = seg_nib.as_reoriented(
+			io_orientation(properties['nibabel_stuff']['original_affine'])
+		)
+		if not np.allclose(
+			properties['nibabel_stuff']['original_affine'], seg_nib_reoriented.affine
+		):
+			print(f'WARNING: Restored affine does not match original affine. File: {output_fname}')
+			print(f'Original affine\n', properties['nibabel_stuff']['original_affine'])
+			print(f'Restored affine\n', seg_nib_reoriented.affine)
+		nibabel.save(seg_nib_reoriented, output_fname)
 
 
 if __name__ == '__main__':
-    img_file = 'patient028_frame01_0000.nii.gz'
-    seg_file = 'patient028_frame01.nii.gz'
+	img_file = 'patient028_frame01_0000.nii.gz'
+	seg_file = 'patient028_frame01.nii.gz'
 
-    nibio = NibabelIO()
-    images, dct = nibio.read_images([img_file])
-    seg, dctseg = nibio.read_seg(seg_file)
+	nibio = NibabelIO()
+	images, dct = nibio.read_images([img_file])
+	seg, dctseg = nibio.read_seg(seg_file)
 
-    nibio_r = NibabelIOWithReorient()
-    images_r, dct_r = nibio_r.read_images([img_file])
-    seg_r, dctseg_r = nibio_r.read_seg(seg_file)
+	nibio_r = NibabelIOWithReorient()
+	images_r, dct_r = nibio_r.read_images([img_file])
+	seg_r, dctseg_r = nibio_r.read_seg(seg_file)
 
-    nibio.write_seg(seg[0], '/home/isensee/seg_nibio.nii.gz', dctseg)
-    nibio_r.write_seg(seg_r[0], '/home/isensee/seg_nibio_r.nii.gz', dctseg_r)
+	nibio.write_seg(seg[0], '/home/isensee/seg_nibio.nii.gz', dctseg)
+	nibio_r.write_seg(seg_r[0], '/home/isensee/seg_nibio_r.nii.gz', dctseg_r)
 
-    s_orig = nibabel.load(seg_file).get_fdata()
-    s_nibio = nibabel.load('/home/isensee/seg_nibio.nii.gz').get_fdata()
-    s_nibio_r = nibabel.load('/home/isensee/seg_nibio_r.nii.gz').get_fdata()
+	s_orig = nibabel.load(seg_file).get_fdata()
+	s_nibio = nibabel.load('/home/isensee/seg_nibio.nii.gz').get_fdata()
+	s_nibio_r = nibabel.load('/home/isensee/seg_nibio_r.nii.gz').get_fdata()
