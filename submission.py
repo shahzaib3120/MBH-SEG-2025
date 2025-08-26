@@ -9,6 +9,7 @@ import nibabel as nib
 import argparse
 from totalsegmentator.python_api import totalsegmentator
 
+
 def move_and_rename_nifti_files(parent_folder):
     # Loop through all subdirectories in the parent folder
     for subdir in os.listdir(parent_folder):
@@ -18,12 +19,14 @@ def move_and_rename_nifti_files(parent_folder):
         if os.path.isdir(subdir_path):
             # Loop through files in the subdirectory
             for filename in os.listdir(subdir_path):
-                if filename.endswith('.nii.gz'):
+                if filename.endswith(".nii.gz"):
                     file_path = os.path.join(subdir_path, filename)
 
                     # Construct new filename based on the parent directory name
                     new_filename = f"{subdir}.nii.gz"
-                    new_file_path = os.path.join(parent_folder, new_filename).replace("_0000.nii.gz", ".nii.gz")
+                    new_file_path = os.path.join(parent_folder, new_filename).replace(
+                        "_0000.nii.gz", ".nii.gz"
+                    )
 
                     # Move and rename the file one directory up
                     shutil.move(file_path, new_file_path)
@@ -37,8 +40,8 @@ def combine_segmentations(folder1, folder2, output_folder, nifti_dir):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    folder1_files = [f for f in os.listdir(folder1) if f.endswith('.nii.gz')]
-    folder2_files = [f for f in os.listdir(folder2) if f.endswith('.nii.gz')]
+    folder1_files = [f for f in os.listdir(folder1) if f.endswith(".nii.gz")]
+    folder2_files = [f for f in os.listdir(folder2) if f.endswith(".nii.gz")]
 
     # Ensure both folders contain the same files
     common_files = set(folder1_files).intersection(set(folder2_files))
@@ -52,7 +55,9 @@ def combine_segmentations(folder1, folder2, output_folder, nifti_dir):
         file2_path = os.path.join(folder2, file)
 
         try:
-            corresponding_nifti_path = os.path.join(nifti_dir, file.replace(".nii.gz", "_0000.nii.gz"))
+            corresponding_nifti_path = os.path.join(
+                nifti_dir, file.replace(".nii.gz", "_0000.nii.gz")
+            )
             nifti_img = nib.load(corresponding_nifti_path)
 
             # Load both NIfTI files
@@ -67,7 +72,9 @@ def combine_segmentations(folder1, folder2, output_folder, nifti_dir):
             combined_data = np.maximum(data1, data2)
 
             # Create a new NIfTI image with the combined data
-            combined_nifti = nib.Nifti1Image(combined_data, nifti_img.affine, nifti_img.header)
+            combined_nifti = nib.Nifti1Image(
+                combined_data, nifti_img.affine, nifti_img.header
+            )
 
             # Save the combined NIfTI image to the output folder
             output_path = os.path.join(output_folder, file)
@@ -78,11 +85,13 @@ def combine_segmentations(folder1, folder2, output_folder, nifti_dir):
         except Exception as e:
             print(f"Error processing {file}: {e}")
 
+
 def binarize_charite_outputs(segmentation_directory, nifti_dir):
     for file_name in os.listdir(segmentation_directory):
         if file_name.endswith(".nii.gz"):
-
-            corresponding_nifti_path = os.path.join(nifti_dir, file_name.replace(".nii.gz", "_0000.nii.gz"))
+            corresponding_nifti_path = os.path.join(
+                nifti_dir, file_name.replace(".nii.gz", "_0000.nii.gz")
+            )
 
             seg_file_path = os.path.join(segmentation_directory, file_name)
 
@@ -125,24 +134,26 @@ def binarize_charite_outputs(segmentation_directory, nifti_dir):
 
 
 def total_segmentator_segment(input_folder, output_folder):
-
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
     for filename in os.listdir(input_folder):
-        if filename.endswith('.nii.gz'):
+        if filename.endswith(".nii.gz"):
             input_filepath = os.path.join(input_folder, filename)
 
             # Construct the output path (without the .nii.gz extension)
-            output_name = filename.replace('.nii.gz', '')
+            output_name = filename.replace(".nii.gz", "")
             output_filepath = os.path.join(output_folder, output_name)
 
             # Construct the TotalSegmentator command
             command = [
                 "TotalSegmentator",
-                "-i", input_filepath,
-                "-o", output_filepath,
-                "-ta", "cerebral_bleed"
+                "-i",
+                input_filepath,
+                "-o",
+                output_filepath,
+                "-ta",
+                "cerebral_bleed",
             ]
 
             # Execute the command using subprocess
@@ -160,6 +171,7 @@ def add_channel_back_to_folder(output, original_test_folder):
 
             shutil.copy(file_path, original_test_folder)
 
+
 def run_nnUNet_ensemble(output_folder_2d, output_folder_3d, results_folder):
     # Define the command as a list of arguments
     command = [
@@ -170,22 +182,28 @@ def run_nnUNet_ensemble(output_folder_2d, output_folder_3d, results_folder):
         "-o",
         results_folder,
         "-np",
-        "8"
+        "8",
     ]
 
     # Run the command and capture the output
     result = subprocess.run(command, check=True, text=True, capture_output=True)
 
-def presegmentation(total_segmentator_output_folder, charite_results_folder, final_channel_folder, imagesTs_path):
+
+def presegmentation(
+    total_segmentator_output_folder,
+    charite_results_folder,
+    final_channel_folder,
+    imagesTs_path,
+):
     predictor_2d = nnUNetPredictor(
         tile_step_size=0.5,
         use_gaussian=True,
         use_mirroring=True,
         perform_everything_on_device=True,
-        device=torch.device('cuda', 0),
+        device=torch.device("cuda", 0),
         verbose=False,
         verbose_preprocessing=False,
-        allow_tqdm=True
+        allow_tqdm=True,
     )
 
     predictor_3d = nnUNetPredictor(
@@ -193,36 +211,48 @@ def presegmentation(total_segmentator_output_folder, charite_results_folder, fin
         use_gaussian=True,
         use_mirroring=True,
         perform_everything_on_device=True,
-        device=torch.device('cuda', 0),
+        device=torch.device("cuda", 0),
         verbose=False,
         verbose_preprocessing=False,
-        allow_tqdm=True
+        allow_tqdm=True,
     )
 
     # CHARITE 2d
     predictor_2d.initialize_from_trained_model_folder(
         "models/prelabeling/nnUNetTrainer__nnUNetPlans__2d",
         use_folds=(0,),
-        checkpoint_name='checkpoint_best.pth',
+        checkpoint_name="checkpoint_best.pth",
     )
 
     predictor_3d.initialize_from_trained_model_folder(
         "models/prelabeling/nnUNetTrainer__nnUNetPlans__3d_fullres",
         use_folds=(0,),
-        checkpoint_name='checkpoint_best.pth',
+        checkpoint_name="checkpoint_best.pth",
     )
 
-    predictor_2d.predict_from_files(imagesTs_path,
-                                 output_folder_2d,
-                                 save_probabilities=True, overwrite=False,
-                                 num_processes_preprocessing=8, num_processes_segmentation_export=8,
-                                 folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
+    predictor_2d.predict_from_files(
+        imagesTs_path,
+        output_folder_2d,
+        save_probabilities=True,
+        overwrite=False,
+        num_processes_preprocessing=8,
+        num_processes_segmentation_export=8,
+        folder_with_segs_from_prev_stage=None,
+        num_parts=1,
+        part_id=0,
+    )
 
-    predictor_3d.predict_from_files(imagesTs_path,
-                                 output_folder_3d,
-                                 save_probabilities=True, overwrite=False,
-                                 num_processes_preprocessing=8, num_processes_segmentation_export=8,
-                                 folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
+    predictor_3d.predict_from_files(
+        imagesTs_path,
+        output_folder_3d,
+        save_probabilities=True,
+        overwrite=False,
+        num_processes_preprocessing=8,
+        num_processes_segmentation_export=8,
+        folder_with_segs_from_prev_stage=None,
+        num_parts=1,
+        part_id=0,
+    )
 
     # Ensemble between 2d and 3d Charite model
     run_nnUNet_ensemble(output_folder_2d, output_folder_3d, charite_results_folder)
@@ -236,33 +266,39 @@ def presegmentation(total_segmentator_output_folder, charite_results_folder, fin
     # change filenames to nnUnet
     move_and_rename_nifti_files(total_segmentator_output_folder)
 
-    combine_segmentations(total_segmentator_output_folder, charite_results_folder, final_channel_folder, imagesTs_path)
-
+    combine_segmentations(
+        total_segmentator_output_folder,
+        charite_results_folder,
+        final_channel_folder,
+        imagesTs_path,
+    )
 
 
 def run_inference(input_folder, output_folder_L):
-
     predictor_L = nnUNetPredictor(
         tile_step_size=0.5,
         use_gaussian=True,
         use_mirroring=True,
         perform_everything_on_device=True,
-        device=torch.device('cuda', 0),
+        device=torch.device("cuda", 0),
         verbose=False,
         verbose_preprocessing=False,
-        allow_tqdm=True
+        allow_tqdm=True,
     )
 
     predictor_L.initialize_from_trained_model_folder(
         "models/multiclass/nnUNetTrainerDA5__nnUNetResEncUNetLPlans__3d_fullres",
-        use_folds=(0,1,2,3,4),
-        checkpoint_name='checkpoint_best.pth',
+        use_folds=(0, 1, 2, 3, 4),
+        checkpoint_name="checkpoint_best.pth",
     )
 
-    predictor_L.predict_from_files(input_folder,
-                                 output_folder_L,
-                                 save_probabilities=True, overwrite=False,
-                                 folder_with_segs_from_prev_stage=None)
+    predictor_L.predict_from_files(
+        input_folder,
+        output_folder_L,
+        save_probabilities=True,
+        overwrite=False,
+        folder_with_segs_from_prev_stage=None,
+    )
 
 
 def preprocess_SHD_EDH_in_nifti(nifti_path):
@@ -292,8 +328,10 @@ def preprocess_SHD_EDH_in_nifti(nifti_path):
 
         # Iterate through each connected component
         for i in range(1, num_features + 1):
-            component = (labeled_mask == i)
-            unique_classes, counts = np.unique(segmentation[component], return_counts=True)
+            component = labeled_mask == i
+            unique_classes, counts = np.unique(
+                segmentation[component], return_counts=True
+            )
 
             # Only interested in components containing class 1 and class 5
             if class_1 in unique_classes and class_5 in unique_classes:
@@ -308,9 +346,8 @@ def preprocess_SHD_EDH_in_nifti(nifti_path):
     class_4_voxels = np.sum(segmentation == class_4)
     class_5_voxels = np.sum(segmentation == class_5)
 
-
     # Remove class voxels if they are fewer than 25
-    if class_1_voxels < 25 and class_1_voxels !=0:
+    if class_1_voxels < 25 and class_1_voxels != 0:
         segmentation[segmentation == class_1] = 0
         print(f"Class 1 had fewer than 25 voxels, removed all class 1 voxels.")
 
@@ -318,25 +355,37 @@ def preprocess_SHD_EDH_in_nifti(nifti_path):
         segmentation[segmentation == class_4] = 0
         print(f"Class 4 had fewer than 25 voxels, removed all class 4 voxels.")
 
-    if class_5_voxels < 25 and class_5_voxels !=0:
+    if class_5_voxels < 25 and class_5_voxels != 0:
         segmentation[segmentation == class_5] = 0
         print(f"Class 5 had fewer than 25 voxels, removed all class 5 voxels.")
 
-
     # Save the processed segmentation to a new NIfTI file
-    processed_nifti = nib.Nifti1Image(segmentation, nifti_file.affine, nifti_file.header)
+    processed_nifti = nib.Nifti1Image(
+        segmentation, nifti_file.affine, nifti_file.header
+    )
     nib.save(processed_nifti, nifti_path)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Run nnUNet inference and preprocessing on NIFTI files.')
-    parser.add_argument('--input_folder', type=str, required=True, help='Path to input folder with NIFTI files.')
-    parser.add_argument('--output_folder', type=str, required=True, help='Path to store the output predictions.')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Run nnUNet inference and preprocessing on NIFTI files."
+    )
+    parser.add_argument(
+        "--input_folder",
+        type=str,
+        required=True,
+        help="Path to input folder with NIFTI files.",
+    )
+    parser.add_argument(
+        "--output_folder",
+        type=str,
+        required=True,
+        help="Path to store the output predictions.",
+    )
 
     args = parser.parse_args()
     input_folder = args.input_folder
     output_folder = args.output_folder
-
 
     temp_input_folder = os.path.join(output_folder, "temp", "input")
     shutil.copytree(input_folder, temp_input_folder)
@@ -347,33 +396,43 @@ if __name__ == '__main__':
             file_path = os.path.join(temp_input_folder, file)
             os.rename(file_path, file_path.replace(".nii", "_0000.nii"))
 
-
     # Output folders for 3 open source prelabeling models
-    output_folder_2d =  os.path.join(output_folder, "temp", "_charite_model_2d")
+    output_folder_2d = os.path.join(output_folder, "temp", "_charite_model_2d")
     output_folder_3d = os.path.join(output_folder, "temp", "_charite_model_3d_fullres")
-    total_segmentator_output_folder = os.path.join(output_folder, "temp", "_demo_totalsegmentator")
-    charite_results_folder = os.path.join(output_folder, "temp", "ensemble_charite_prelabeling")
+    total_segmentator_output_folder = os.path.join(
+        output_folder, "temp", "_demo_totalsegmentator"
+    )
+    charite_results_folder = os.path.join(
+        output_folder, "temp", "ensemble_charite_prelabeling"
+    )
 
     # Final binary prelabeling prediction will be stored in final_channel_folder
-    final_channel_folder = os.path.join(output_folder, "temp", "FINAL_PRELABELING_CHANNEL")
+    final_channel_folder = os.path.join(
+        output_folder, "temp", "FINAL_PRELABELING_CHANNEL"
+    )
 
-    presegmentation(total_segmentator_output_folder, charite_results_folder, final_channel_folder, temp_input_folder)
+    presegmentation(
+        total_segmentator_output_folder,
+        charite_results_folder,
+        final_channel_folder,
+        temp_input_folder,
+    )
 
-    add_channel_back_to_folder(final_channel_folder, temp_input_folder)
+    # add_channel_back_to_folder(final_channel_folder, temp_input_folder)
 
-    torch.multiprocessing.set_start_method('spawn', force=True)
+    # torch.multiprocessing.set_start_method("spawn", force=True)
 
-    output_folder_L = os.path.join(output_folder, "temp", "model_L")
+    # output_folder_L = os.path.join(output_folder, "temp", "model_L")
 
-    final_results_folder = os.path.join(output_folder, "SecondStage_results/Output")
+    # final_results_folder = os.path.join(output_folder, "SecondStage_results/Output")
 
-    run_inference(temp_input_folder, final_results_folder)
+    # run_inference(temp_input_folder, final_results_folder)
 
-    shutil.rmtree(os.path.join(output_folder, "temp"))
+    # shutil.rmtree(os.path.join(output_folder, "temp"))
 
-    for file in os.listdir(final_results_folder):
-        if file.endswith(".nii.gz"):
-            nifti_path_to_process = os.path.join(final_results_folder, file)
-            preprocess_SHD_EDH_in_nifti(nifti_path_to_process)
-        else:
-            os.remove(os.path.join(final_results_folder, file))
+    # for file in os.listdir(final_results_folder):
+    #     if file.endswith(".nii.gz"):
+    #         nifti_path_to_process = os.path.join(final_results_folder, file)
+    #         preprocess_SHD_EDH_in_nifti(nifti_path_to_process)
+    #     else:
+    #         os.remove(os.path.join(final_results_folder, file))

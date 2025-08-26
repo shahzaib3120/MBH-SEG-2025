@@ -1,0 +1,9 @@
+[project]
+name = "mbh-seg-2024-winning-solution"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "totalsegmentator==2.4.0",
+]
