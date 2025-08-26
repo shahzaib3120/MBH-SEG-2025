@@ -7,3 +7,14 @@ requires-python = ">=3.11"
 dependencies = [
     "totalsegmentator==2.4.0",
 ]
+
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint.flake8-import-conventions]
+group-imports = true
+
+[tool.ruff.lint.isort]
+profile = "black"
