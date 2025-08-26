@@ -11,6 +11,5 @@ __pycache__/
 *.pyzwzwz
 
 nnunetv2/
-nnunetv2_local/
 
 models/
